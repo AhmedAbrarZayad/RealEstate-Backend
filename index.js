@@ -87,6 +87,9 @@ async function run() {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
         const user = await usersCollection.findOne(query);
+        if(user.email !== req.user.email){
+            return res.status(403).json({ message: 'Forbidden access' });
+        }
         const propertyIds = user.properties || [];
         const objectIds = propertyIds.map(pid => new ObjectId(pid));
         const properties = await propertyCollection.find({ _id: { $in: objectIds } }).toArray();
@@ -95,6 +98,13 @@ async function run() {
 
     app.patch('/users/:id/properties/:propertyId', verifyFirebaseJWTToken, async (req, res) => {
         const id = req.params.id;
+        const user = await usersCollection.findOne({ _id: new ObjectId(id) });
+        if(user.email !== req.user.email){
+            return res.status(403).json({ message: 'Forbidden access' });
+        }
+        if(!user.properties || !user.properties.includes(req.params.propertyId)){
+            return res.status(403).json({ message: 'Forbidden access to this property' });
+        }
         const propertyId = req.params.propertyId;
         const newProperty = req.body;
 
@@ -112,6 +122,14 @@ async function run() {
     })
 
     app.delete('/users/:id/properties/:propertyId', verifyFirebaseJWTToken, async (req, res) => {
+        const id = req.params.id;
+        const user = await usersCollection.findOne({ _id: new ObjectId(id) });
+        if(user.email !== req.user.email){
+            return res.status(403).json({ message: 'Forbidden access' });
+        }
+        if(!user.properties || !user.properties.includes(req.params.propertyId)){
+            return res.status(403).json({ message: 'Forbidden access to this property' });
+        }
         const query = { _id: new ObjectId(req.params.propertyId) };
         const result = await propertyCollection.deleteOne(query);
         res.send(result);
@@ -119,6 +137,9 @@ async function run() {
     // Property APIs
     app.post('/property', verifyFirebaseJWTToken, async (req, res) => {
         const email = req.query.email;
+        if(email !== req.user.email){
+            return res.status(403).json({ message: 'Forbidden access' });
+        }
         console.log(req.body);
         const property = req.body;
         await usersCollection.updateOne(
@@ -198,9 +219,19 @@ async function run() {
         const result = await reviewsCollection.updateOne({ _id: new ObjectId(id) }, updateDoc);
         res.send(result);
     });
-    app.delete('/reviews/:id', async (req, res) => {
-        const query = { _id: new ObjectId(req.params.id) };
-        const result = await reviewsCollection.deleteOne(query);
+    app.delete('/reviews/:id', verifyFirebaseJWTToken, async (req, res) => {
+        const userEmail = req.user.email;
+        const cursor = usersCollection.find({ email: userEmail });
+        const user = await cursor.toArray();
+        const userId = user[0]._id;
+        const id = req.params.id;
+        
+        const review = await reviewsCollection.findOne({ _id: new ObjectId(id) });
+        if(review.reviewerId.toString() !== userId.toString()){
+            return res.status(403).json({ message: 'Forbidden access' });
+        }
+        
+        const result = await reviewsCollection.deleteOne({ _id: new ObjectId(id) });
         res.send(result);
     });
 
