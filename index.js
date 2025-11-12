@@ -118,7 +118,47 @@ async function run() {
         const property = await propertyCollection.findOne(query);
         res.send(property);
     })
-
+    
+    // Review APIs
+    app.post('/reviews', async (req, res) => {
+        const review = req.body;
+        const result = await reviewsCollection.insertOne(review);
+        res.send(result);
+    });
+    app.get('/reviews', async (req, res) => {
+        const email = req.query.email;
+        const query = {}
+        if(email){
+            query.email = email;
+        }
+        const cursor = reviewsCollection.find(query);
+        const reviews = await cursor.toArray();
+        res.send(reviews);
+    });
+    app.get('/reviews/:propertyId', async (req, res) => {
+        const propertyId = req.params.propertyId;
+        const query = { propertyId: propertyId };
+        const cursor = reviewsCollection.find(query);
+        const reviews = await cursor.toArray();
+        res.send(reviews);
+    });
+    app.patch('/reviews/:id', async (req, res) => {
+        const id = req.params.id;
+        const updatedReview = req.body;
+        const updateDoc = {
+            $set: {
+                starRating: updatedReview.starRating,
+                reviewText: updatedReview.reviewText
+            }
+        };
+        const result = await reviewsCollection.updateOne({ _id: new ObjectId(id) }, updateDoc);
+        res.send(result);
+    });
+    app.delete('/reviews/:id', async (req, res) => {
+        const query = { _id: new ObjectId(req.params.id) };
+        const result = await reviewsCollection.deleteOne(query);
+        res.send(result);
+    });
   } finally {
     // Ensures that the client will close when you finish/error
     //await client.close();
