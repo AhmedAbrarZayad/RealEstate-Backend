@@ -87,6 +87,37 @@ async function run() {
         const result = await propertyCollection.deleteOne(query);
         res.send(result);
     });
+    // Property APIs
+    app.post('/property', async (req, res) => {
+        const email = req.query.email;
+        console.log(req.body);
+        const property = req.body;
+        await usersCollection.updateOne(
+            { email: email },
+            { $push: { properties: property._id } }
+        );
+        const result = await propertyCollection.insertOne(property);
+    
+        res.send(result);
+    })
+
+    app.get('/property', async (req, res) => {
+        const email = req.query.email;
+        const query = {};
+        if(email){
+            query.email = email;
+        }
+        const cursor = propertyCollection.find(query);
+        const properties = await cursor.toArray();
+        res.send(properties);
+    })
+
+    app.get('/property/:id', async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const property = await propertyCollection.findOne(query);
+        res.send(property);
+    })
 
   } finally {
     // Ensures that the client will close when you finish/error
