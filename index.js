@@ -1,6 +1,13 @@
 const express = require('express');
 const app = express();
+const admin = require('firebase-admin');
 require('dotenv').config({ path: '../.env' });
+
+var serviceAccount = require("path/to/serviceAccountKey.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
 
 // PORT
 const port = process.env.PORT || 4000;
@@ -118,7 +125,7 @@ async function run() {
         const property = await propertyCollection.findOne(query);
         res.send(property);
     })
-    
+
     // Review APIs
     app.post('/reviews', async (req, res) => {
         const review = req.body;
@@ -159,6 +166,8 @@ async function run() {
         const result = await reviewsCollection.deleteOne(query);
         res.send(result);
     });
+
+
   } finally {
     // Ensures that the client will close when you finish/error
     //await client.close();
