@@ -1,7 +1,8 @@
 const express = require('express');
 const app = express();
 const admin = require('firebase-admin');
-require('dotenv').config({ path: '../.env' });
+require('dotenv').config();
+
 
 var serviceAccount = require("../realestate-fbcf5-firebase-adminsdk-fbsvc-0aded39002.json");
 
