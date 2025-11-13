@@ -54,7 +54,7 @@ app.get('/', (req, res) => {
 
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const uri = "mongodb+srv://ahmedabrarzayad_db_user:ehTQ7NWEIDfaYEOn@cluster0.ccvlctc.mongodb.net/?appName=Cluster0";
+const uri = `mongodb+srv://ahmedabrarzayad_db_user:${mongodbPass}@cluster0.ccvlctc.mongodb.net/?appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -336,7 +336,13 @@ async function run() {
         res.send(result);
     });
 
-  } finally {
+  }
+  catch (err){
+    console.error("Failed to connect to MongoDB:", error);
+    // Optionally, add a fallback route or error handler
+    app.use((req, res) => res.status(500).send(`${err}`));
+  } 
+  finally {
     // Ensures that the client will close when you finish/error
     //await client.close();
   }
