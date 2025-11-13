@@ -179,9 +179,16 @@ async function run() {
         try {
             const sortBy = req.query.sortBy || 'price'; // default field to sort
             const order = req.query.order === 'desc' ? -1 : 1; // default ascending
+            const searchQuery = req.query.search || ''; // search query
+            
             const query = {};
 
-            // Fetch properties with sorting
+            // Add search filter if search query exists
+            if (searchQuery) {
+                query.name = { $regex: searchQuery, $options: 'i' }; // case-insensitive search
+            }
+
+            // Fetch properties with sorting and search
             const cursor = propertyCollection.find(query).sort({ [sortBy]: order });
             const properties = await cursor.toArray();
 
