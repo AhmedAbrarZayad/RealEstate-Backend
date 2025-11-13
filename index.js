@@ -77,6 +77,11 @@ async function run() {
     // User APIs
     app.post('/users', async (req, res) => {
         const user = req.body;
+        const query = { email: user.email };
+        const existingUser = await usersCollection.findOne(query);
+        if(existingUser){
+            return res.send({ message: 'User already exists' });
+        }
         const result = await usersCollection.insertOne(user);
         res.send(result);
     });
@@ -149,19 +154,11 @@ async function run() {
         res.send(result);
     })
 
-    app.get('/property', verifyFirebaseJWTToken, async (req, res) => {
+    app.get('/property', async (req, res) => {
         try {
-            const email = req.query.email;
             const sortBy = req.query.sortBy || 'createdAt'; // default field to sort
             const order = req.query.order === 'desc' ? -1 : 1; // default ascending
             const query = {};
-
-            if (email) {
-                if (email !== req.user.email) {
-                    return res.status(403).json({ message: 'Forbidden access' });
-                }
-                query.email = email;
-            }
 
             // Fetch properties with sorting
             const cursor = propertyCollection.find(query).sort({ [sortBy]: order });
