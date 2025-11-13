@@ -3,7 +3,6 @@ const app = express();
 const admin = require('firebase-admin');
 require('dotenv').config();
 
-
 // index.js
 const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString("utf8");
 const serviceAccount = JSON.parse(decoded);
@@ -51,8 +50,6 @@ app.get('/', (req, res) => {
     res.send(`Hello`);
 });
 
-
-
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://ahmedabrarzayad_db_user:${mongodbPass}@cluster0.ccvlctc.mongodb.net/?appName=Cluster0`;
 
@@ -65,20 +62,31 @@ const client = new MongoClient(uri, {
   }
 });
 
-async function run() {
-  try {
+let propertyCollection;
+let usersCollection;
+let reviewsCollection;
 
-    const database = client.db("estatesDB");
-    const propertyCollection = database.collection("property");
-    const usersCollection = database.collection("users");
-    const reviewsCollection = database.collection("reviews");
+// Cached init promise for lazy connection
+let initPromise;
+const initDB = async () => {
+  if (!initPromise) {
+    initPromise = (async () => {
+      await client.connect();
+      await client.db("admin").command({ ping: 1 });
+      console.log("Pinged your deployment. You successfully connected to MongoDB!");
+      const database = client.db("estatesDB");
+      propertyCollection = database.collection("property");
+      usersCollection = database.collection("users");
+      reviewsCollection = database.collection("reviews");
+    })();
+  }
+  await initPromise;
+};
 
-    await client.connect();
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
-
-    // User APIs
-    app.post('/users', async (req, res) => {
+// User APIs
+app.post('/users', async (req, res) => {
+    try {
+        await initDB();
         const user = req.body;
         const query = { email: user.email };
 
@@ -89,8 +97,14 @@ async function run() {
 
         const result = await usersCollection.insertOne(user);
         res.status(201).json({ message: 'User created successfully', result });
-    });
-    app.get('/users', verifyFirebaseJWTToken, async (req, res) => {
+    } catch (err) {
+        console.error('Error in /users POST:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+app.get('/users', verifyFirebaseJWTToken, async (req, res) => {
+    try {
+        await initDB();
         const email = req.query.email;
         if(email !== req.user.email){
             return res.status(403).json({ message: 'Forbidden access' });
@@ -99,8 +113,14 @@ async function run() {
         const user = await usersCollection.findOne(query);
         const id = {_id: user._id};
         res.send(id);
-    });
-    app.get('/users/:id', verifyFirebaseJWTToken, async (req, res) => {
+    } catch (err) {
+        console.error('Error in /users GET:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+app.get('/users/:id', verifyFirebaseJWTToken, async (req, res) => {
+    try {
+        await initDB();
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
         const user = await usersCollection.findOne(query);
@@ -108,8 +128,14 @@ async function run() {
             return res.status(403).json({ message: 'Forbidden access' });
         }
         res.send(user);
-    });
-    app.get('/users/:id/properties', verifyFirebaseJWTToken, async (req, res) => {
+    } catch (err) {
+        console.error('Error in /users/:id GET:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+app.get('/users/:id/properties', verifyFirebaseJWTToken, async (req, res) => {
+    try {
+        await initDB();
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
         const user = await usersCollection.findOne(query);
@@ -120,9 +146,15 @@ async function run() {
         const objectIds = propertyIds.map(pid => new ObjectId(pid));
         const properties = await propertyCollection.find({ _id: { $in: objectIds } }).toArray();
         res.send(properties);
-    });
+    } catch (err) {
+        console.error('Error in /users/:id/properties GET:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
 
-    app.patch('/users/:id/properties/:propertyId', verifyFirebaseJWTToken, async (req, res) => {
+app.patch('/users/:id/properties/:propertyId', verifyFirebaseJWTToken, async (req, res) => {
+    try {
+        await initDB();
         const id = req.params.id;
         const user = await usersCollection.findOne({ _id: new ObjectId(id) });
         if(user.email !== req.user.email){
@@ -145,9 +177,16 @@ async function run() {
             }
         }
         const result = await propertyCollection.updateOne({ _id: new ObjectId(propertyId) }, updateProperty);
-    })
+        res.send(result);
+    } catch (err) {
+        console.error('Error in /users/:id/properties/:propertyId PATCH:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+})
 
-    app.delete('/users/:id/properties/:propertyId', verifyFirebaseJWTToken, async (req, res) => {
+app.delete('/users/:id/properties/:propertyId', verifyFirebaseJWTToken, async (req, res) => {
+    try {
+        await initDB();
         const id = req.params.id;
         const user = await usersCollection.findOne({ _id: new ObjectId(id) });
         if(user.email !== req.user.email){
@@ -159,9 +198,15 @@ async function run() {
         const query = { _id: new ObjectId(req.params.propertyId) };
         const result = await propertyCollection.deleteOne(query);
         res.send(result);
-    });
-    // Property APIs
-    app.post('/property', verifyFirebaseJWTToken, async (req, res) => {
+    } catch (err) {
+        console.error('Error in /users/:id/properties/:propertyId DELETE:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+// Property APIs
+app.post('/property', verifyFirebaseJWTToken, async (req, res) => {
+    try {
+        await initDB();
         const email = req.query.email;
         if(email !== req.user.email){
             return res.status(403).json({ message: 'Forbidden access' });
@@ -176,52 +221,60 @@ async function run() {
         );
     
         res.send(result);
-    })
+    } catch (err) {
+        console.error('Error in /property POST:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+})
 
-    app.get('/property', async (req, res) => {
-        try {
-            const sortBy = req.query.sortBy || 'price'; // default field to sort
-            const order = req.query.order === 'desc' ? -1 : 1; // default ascending
-            const searchQuery = req.query.search || ''; // search query
-            
-            const query = {};
+app.get('/property', async (req, res) => {
+    try {
+        await initDB();
+        const sortBy = req.query.sortBy || 'price'; // default field to sort
+        const order = req.query.order === 'desc' ? -1 : 1; // default ascending
+        const searchQuery = req.query.search || ''; // search query
+        
+        const query = {};
 
-            // Add search filter if search query exists
-            if (searchQuery) {
-                query.name = { $regex: searchQuery, $options: 'i' }; // case-insensitive search
-            }
-
-            // Fetch properties with sorting and search
-            const cursor = propertyCollection.find(query).sort({ [sortBy]: order });
-            const properties = await cursor.toArray();
-
-            res.json(properties);
-        } catch (error) {
-            console.error('Error fetching properties:', error);
-            res.status(500).json({ message: 'Server error' });
+        // Add search filter if search query exists
+        if (searchQuery) {
+            query.name = { $regex: searchQuery, $options: 'i' }; // case-insensitive search
         }
-    });
-    
-    app.get('/my-properties', verifyFirebaseJWTToken, async (req, res) => {
-        try{
-            const email = req.query.email;
-            if(email !== req.user.email){
-                return res.status(403).json({ message: 'Forbidden access' });
-            }
-            console.log(email);
-            const user = await usersCollection.findOne({ email: email });
-            const propertyIds = user.properties || [];
-            const objectIds = propertyIds.map(pid => new ObjectId(pid));
-            const properties = await propertyCollection.find({ _id: { $in: objectIds } }).toArray();
-            res.send(properties);
-        }
-        catch(err){
-            console.error('Error fetching my properties:', err);
-            res.status(500).json({ message: 'Server error' });
-        }
-    });
 
-    app.delete('/my-properties/:propertyId', verifyFirebaseJWTToken, async (req, res) => {
+        // Fetch properties with sorting and search
+        const cursor = propertyCollection.find(query).sort({ [sortBy]: order });
+        const properties = await cursor.toArray();
+
+        res.json(properties);
+    } catch (error) {
+        console.error('Error fetching properties:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.get('/my-properties', verifyFirebaseJWTToken, async (req, res) => {
+    try{
+        await initDB();
+        const email = req.query.email;
+        if(email !== req.user.email){
+            return res.status(403).json({ message: 'Forbidden access' });
+        }
+        console.log(email);
+        const user = await usersCollection.findOne({ email: email });
+        const propertyIds = user.properties || [];
+        const objectIds = propertyIds.map(pid => new ObjectId(pid));
+        const properties = await propertyCollection.find({ _id: { $in: objectIds } }).toArray();
+        res.send(properties);
+    }
+    catch(err){
+        console.error('Error fetching my properties:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.delete('/my-properties/:propertyId', verifyFirebaseJWTToken, async (req, res) => {
+    try {
+        await initDB();
         const email = req.query.email;
         if(email !== req.user.email){
             return res.status(403).json({ message: 'Forbidden access' });
@@ -233,8 +286,14 @@ async function run() {
             { $pull: { properties: propertyId } }
         );
         res.send(result);
-    });
-    app.get('/not-my-properties', verifyFirebaseJWTToken, async (req, res) => {
+    } catch (err) {
+        console.error('Error in /my-properties/:propertyId DELETE:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+app.get('/not-my-properties', verifyFirebaseJWTToken, async (req, res) => {
+    try {
+        await initDB();
         const email = req.query.email;
         if(email !== req.user.email){
             return res.status(403).json({ message: 'Forbidden access' });
@@ -244,8 +303,14 @@ async function run() {
         const objectIds = propertyIds.map(pid => new ObjectId(pid));
         const properties = await propertyCollection.find({ _id: { $nin: objectIds } }).toArray();
         res.send(properties);
-    });
-    app.patch('/my-properties/:propertyId', verifyFirebaseJWTToken, async (req, res) => {
+    } catch (err) {
+        console.error('Error in /not-my-properties GET:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+app.patch('/my-properties/:propertyId', verifyFirebaseJWTToken, async (req, res) => {
+    try {
+        await initDB();
         const email = req.query.email;
         if(email !== req.user.email){
             return res.status(403).json({ message: 'Forbidden access' });
@@ -264,22 +329,40 @@ async function run() {
         };
         const result = await propertyCollection.updateOne({ _id: new ObjectId(propertyId) }, updateDoc);
         res.send(result);
-    });
+    } catch (err) {
+        console.error('Error in /my-properties/:propertyId PATCH:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
 
-    app.get('/property/:id', async (req, res) => {
+app.get('/property/:id', async (req, res) => {
+    try {
+        await initDB();
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
         const property = await propertyCollection.findOne(query);
         res.send(property);
-    })
+    } catch (err) {
+        console.error('Error in /property/:id GET:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+})
 
-    // Review APIs
-    app.post('/reviews', verifyFirebaseJWTToken, async (req, res) => {
+// Review APIs
+app.post('/reviews', verifyFirebaseJWTToken, async (req, res) => {
+    try {
+        await initDB();
         const review = req.body;
         const result = await reviewsCollection.insertOne(review);
         res.send(result);
-    });
-    app.get('/reviews', verifyFirebaseJWTToken, async (req, res) => {
+    } catch (err) {
+        console.error('Error in /reviews POST:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+app.get('/reviews', verifyFirebaseJWTToken, async (req, res) => {
+    try {
+        await initDB();
         const email = req.query.email;
         const query = {}
         if(email){
@@ -292,15 +375,27 @@ async function run() {
         const cursor = reviewsCollection.find(query);
         const reviews = await cursor.toArray();
         res.send(reviews);
-    });
-    app.get('/reviews/:propertyId', async (req, res) => {
+    } catch (err) {
+        console.error('Error in /reviews GET:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+app.get('/reviews/:propertyId', async (req, res) => {
+    try {
+        await initDB();
         const propertyId = req.params.propertyId;
         const query = { propertyId: propertyId };
         const cursor = reviewsCollection.find(query);
         const reviews = await cursor.toArray();
         res.send(reviews);
-    });
-    app.patch('/reviews/:id', verifyFirebaseJWTToken, async (req, res) => {
+    } catch (err) {
+        console.error('Error in /reviews/:propertyId GET:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+app.patch('/reviews/:id', verifyFirebaseJWTToken, async (req, res) => {
+    try {
+        await initDB();
         const userEmail = req.user.email;
         const cursor = usersCollection.find({ email: userEmail });
         const user = await cursor.toArray();
@@ -319,8 +414,14 @@ async function run() {
         };
         const result = await reviewsCollection.updateOne({ _id: new ObjectId(id) }, updateDoc);
         res.send(result);
-    });
-    app.delete('/reviews/:id', verifyFirebaseJWTToken, async (req, res) => {
+    } catch (err) {
+        console.error('Error in /reviews/:id PATCH:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+app.delete('/reviews/:id', verifyFirebaseJWTToken, async (req, res) => {
+    try {
+        await initDB();
         const userEmail = req.user.email;
         const cursor = usersCollection.find({ email: userEmail });
         const user = await cursor.toArray();
@@ -334,19 +435,10 @@ async function run() {
         
         const result = await reviewsCollection.deleteOne({ _id: new ObjectId(id) });
         res.send(result);
-    });
-
-  }
-  catch (err){
-    console.error("Failed to connect to MongoDB:", error);
-    // Optionally, add a fallback route or error handler
-    app.use((req, res) => res.status(500).send(`${err}`));
-  } 
-  finally {
-    // Ensures that the client will close when you finish/error
-    //await client.close();
-  }
-}
-run().catch(console.dir);
+    } catch (err) {
+        console.error('Error in /reviews/:id DELETE:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
 
 module.exports = app;
