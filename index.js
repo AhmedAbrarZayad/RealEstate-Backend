@@ -4,7 +4,9 @@ const admin = require('firebase-admin');
 require('dotenv').config();
 
 
-var serviceAccount = require("../realestate-fbcf5-firebase-adminsdk-fbsvc-0aded39002.json");
+// index.js
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString("utf8");
+const serviceAccount = JSON.parse(decoded);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
