@@ -78,13 +78,16 @@ async function run() {
     app.post('/users', async (req, res) => {
         const user = req.body;
         const query = { email: user.email };
+
         const existingUser = await usersCollection.findOne(query);
-        if(existingUser){
-            return res.send({ message: 'User already exists' });
+        if (existingUser) {
+            return res.status(200).json({ message: 'User already exists', existingUser: true });
         }
+
         const result = await usersCollection.insertOne(user);
-        res.send(result);
+        res.status(201).json({ message: 'User created successfully', result });
     });
+
 
     app.get('/users/:id/properties', verifyFirebaseJWTToken, async (req, res) => {
         const id = req.params.id;
