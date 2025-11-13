@@ -45,7 +45,7 @@ async function verifyFirebaseJWTToken(req, res, next) {
 
 // APIS
 app.get('/', (req, res) => {
-    res.send(`${mongodbPass}`);
+    res.send(`Hello`);
 });
 
 
@@ -150,18 +150,30 @@ async function run() {
     })
 
     app.get('/property', verifyFirebaseJWTToken, async (req, res) => {
-        const email = req.query.email;
-        const query = {};
-        if(email){
-            if(email !== req.user.email){
-                return res.status(403).json({ message: 'Forbidden access' });
+        try {
+            const email = req.query.email;
+            const sortBy = req.query.sortBy || 'createdAt'; // default field to sort
+            const order = req.query.order === 'desc' ? -1 : 1; // default ascending
+            const query = {};
+
+            if (email) {
+                if (email !== req.user.email) {
+                    return res.status(403).json({ message: 'Forbidden access' });
+                }
+                query.email = email;
             }
-            query.email = email;
+
+            // Fetch properties with sorting
+            const cursor = propertyCollection.find(query).sort({ [sortBy]: order });
+            const properties = await cursor.toArray();
+
+            res.json(properties);
+        } catch (error) {
+            console.error('Error fetching properties:', error);
+            res.status(500).json({ message: 'Server error' });
         }
-        const cursor = propertyCollection.find(query);
-        const properties = await cursor.toArray();
-        res.send(properties);
-    })
+    });
+
 
     app.get('/property/:id', async (req, res) => {
         const id = req.params.id;
