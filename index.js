@@ -87,8 +87,25 @@ async function run() {
         const result = await usersCollection.insertOne(user);
         res.status(201).json({ message: 'User created successfully', result });
     });
-
-
+    app.get('/users', verifyFirebaseJWTToken, async (req, res) => {
+        const email = req.query.email;
+        if(email !== req.user.email){
+            return res.status(403).json({ message: 'Forbidden access' });
+        }
+        const query = { email: email };
+        const user = await usersCollection.findOne(query);
+        const id = {_id: user._id};
+        res.send(id);
+    });
+    app.get('/users/:id', verifyFirebaseJWTToken, async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const user = await usersCollection.findOne(query);
+        if(user.email !== req.user.email){
+            return res.status(403).json({ message: 'Forbidden access' });
+        }
+        res.send(user);
+    });
     app.get('/users/:id/properties', verifyFirebaseJWTToken, async (req, res) => {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
@@ -207,7 +224,17 @@ async function run() {
         );
         res.send(result);
     });
-
+    app.get('/not-my-properties', verifyFirebaseJWTToken, async (req, res) => {
+        const email = req.query.email;
+        if(email !== req.user.email){
+            return res.status(403).json({ message: 'Forbidden access' });
+        }
+        const user = await usersCollection.findOne({ email: email });
+        const propertyIds = user.properties || [];
+        const objectIds = propertyIds.map(pid => new ObjectId(pid));
+        const properties = await propertyCollection.find({ _id: { $nin: objectIds } }).toArray();
+        res.send(properties);
+    });
     app.patch('/my-properties/:propertyId', verifyFirebaseJWTToken, async (req, res) => {
         const email = req.query.email;
         if(email !== req.user.email){
