@@ -336,15 +336,10 @@ async function run() {
         res.send(result);
     });
 
-
+    module.exports = app;
   } finally {
     // Ensures that the client will close when you finish/error
     //await client.close();
   }
 }
 run().catch(console.dir);
-
-
-
-
-module.exports = app;
